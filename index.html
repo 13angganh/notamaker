@@ -1543,11 +1543,12 @@ function xPrint(){
   const ps=PAPERS[S.paper];const pw=ps.w>0?ps.w+'mm':'80mm';const ph=ps.h>0?ps.h+'mm':'auto';
   const html=document.getElementById('no').outerHTML;
   const w=window.open('','_blank');
-  w.document.write(`<html><head><title>Nota</title>
-  <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@300;400;600&family=Barlow+Condensed:wght@200;300;400;600;700&family=Barlow:wght@300;400;500;600;700&family=Source+Code+Pro:wght@400;500;700&family=Libre+Baskerville:wght@400;700&family=Courier+Prime:wght@400;700&display=swap" rel="stylesheet">
-  <style>*{box-sizing:border-box}body{margin:0;padding:0}#no{margin:0 auto}img{display:inline-block}
-  @media print{@page{size:${pw} ${ph};margin:${ps.w<=80?'2mm':'8mm'}}}</style>
-  </head><body>${html}<script>window.onload=()=>setTimeout(()=>window.print(),600)<\/script></body></html>`);
+  const sc='<scr'+'ipt>window.onload=()=>setTimeout(()=>window.print(),600)</scr'+'ipt>';
+  w.document.write('<html><head><title>Nota</title>'
+    +'<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@300;400;600&family=Barlow+Condensed:wght@200;300;400;600;700&family=Barlow:wght@300;400;500;600;700&family=Source+Code+Pro:wght@400;500;700&family=Libre+Baskerville:wght@400;700&family=Courier+Prime:wght@400;700&display=swap" rel="stylesheet">'
+    +'<style>*{box-sizing:border-box}body{margin:0;padding:0}#no{margin:0 auto}img{display:inline-block}'
+    +'@media print{@page{size:'+pw+' '+ph+';margin:'+(ps.w<=80?'2mm':'8mm')+'}}</style>'
+    +'</head><body>'+html+sc+'</body></html>');
   w.document.close();
 }
 async function xPNG(){
