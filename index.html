@@ -224,8 +224,8 @@ function initFB(){
     _db=getFirestore(_app);
     onAuthStateChanged(_auth,user=>{
       window._fbUser=user;
-      if(user) onLogin(user);
-      else onLogout();
+      if(user) { if(typeof window.onLogin==='function') window.onLogin(user); }
+      else { if(typeof window.onLogout==='function') window.onLogout(); }
     });
   }catch(e){console.warn('Firebase init:',e);}
 }
@@ -315,7 +315,7 @@ initFB();
 <div class="app" id="main-app" style="display:none">
 <div class="hdr">
   <div class="logo">Nota<em>Maker</em></div>
-  <span style="font-size:.55rem;color:var(--txt3);font-family:var(--mono);margin-left:2px;margin-top:2px;">v7</span>
+  <span style="font-size:.55rem;color:var(--txt3);font-family:var(--mono);margin-left:2px;margin-top:2px;">v7.1</span>
   <div class="hdr-r">
     <span class="user-chip" id="user-email-chip">...</span>
     <button class="btn b-gh b-sm" id="pwa-install-btn" onclick="doPWAInstall()" title="Pasang ke Layar Utama" style="display:none">📲 Pasang</button>
@@ -552,7 +552,7 @@ let S={
 let importedData=null;
 
 document.addEventListener('DOMContentLoaded',()=>{
-  initFirebase();
+  if(typeof initFB==='function') initFB();
   const now=new Date();
   S.date=now.toISOString().split('T')[0];
   S.time=now.toTimeString().slice(0,5);
@@ -1834,11 +1834,6 @@ function toast(msg,type='ok'){const c=document.getElementById('tw');const t=docu
 
 
 
-
-
-});
-
-
 // ═══════════════════════════════════════════════════════════════════
 // AUTH & CLOUD FEATURES — injected cleanly, no redefinitions
 // ═══════════════════════════════════════════════════════════════════
@@ -1917,6 +1912,9 @@ function onLogout(){
   document.getElementById('user-bar').style.display='none';
   document.getElementById('auth-overlay').style.display='flex';
 }
+// Expose to window so Firebase module (type="module") can call these
+window.onLogin=onLogin;
+window.onLogout=onLogout;
 
 async function syncNotas(){
   if(!_fbLoggedIn){toast('Login dulu untuk sync','err');return;}
@@ -2148,7 +2146,7 @@ document.addEventListener('DOMContentLoaded',function(){
 <div class="auth-overlay" id="auth-overlay">
   <div class="auth-box">
     <div class="auth-logo"><div class="logo">Nota<em>Maker</em></div>
-    <div style="font-size:.68rem;color:#3d5070;text-align:center;margin-top:4px;font-family:'Source Code Pro',monospace;">v7</div></div>
+    <div style="font-size:.68rem;color:#3d5070;text-align:center;margin-top:4px;font-family:'Source Code Pro',monospace;">v7.1</div></div>
     <div class="auth-title" id="auth-title">Masuk ke Akun Anda</div>
     <div class="auth-tab">
       <button class="auth-tab-btn on" id="tab-login" onclick="switchAuthTab('login')">Masuk</button>
