@@ -191,6 +191,65 @@ input[type=file]{display:none;}
 
 /* ── SPBU FIX: content width aware ── */
 .spbu-nota{box-sizing:border-box;}
+
+/* ── EDIT MODE v7.3 ── */
+#panel-preview.edit-mode [data-ef]:hover{
+  outline:2px dashed var(--acc);outline-offset:1px;cursor:text;border-radius:2px;
+}
+#panel-preview.edit-mode [data-ef]{cursor:pointer;transition:outline .15s;}
+.edit-float{
+  position:fixed;z-index:9000;background:#1c2333;border:1.5px solid var(--acc);
+  border-radius:8px;padding:8px 10px;box-shadow:0 4px 20px rgba(0,0,0,.5);
+  min-width:180px;max-width:90vw;
+}
+.edit-float input,.edit-float textarea{
+  width:100%;background:var(--bg3);border:1px solid var(--bdr);border-radius:5px;
+  padding:6px 8px;color:var(--txt);font-size:.85rem;outline:none;
+  font-family:var(--sans);
+}
+.edit-float textarea{min-height:60px;resize:vertical;}
+.edit-float-label{font-size:.65rem;color:var(--txt2);margin-bottom:4px;font-weight:600;text-transform:uppercase;letter-spacing:.4px;}
+.edit-float-btns{display:flex;gap:5px;margin-top:6px;}
+.edit-mode-btn-active{background:var(--acc)!important;color:#fff!important;border-color:var(--acc)!important;}
+
+/* ── SPLIT VIEW — landscape & desktop ── */
+@media (min-width:768px),(orientation:landscape) and (min-width:480px){
+  .split-view-active #panel-preview,
+  .split-view-active #panel-editor{
+    display:block!important;
+  }
+  .split-view-active .tabs [data-p="preview"],
+  .split-view-active .tabs [data-p="editor"]{
+    color:var(--acc);border-bottom-color:var(--acc);
+  }
+  .split-view-active .main{
+    display:grid;
+    grid-template-columns:auto 1fr;
+    gap:12px;
+    align-items:start;
+    max-width:none;
+  }
+  .split-view-active #panel-preview{
+    position:sticky;top:110px;
+    max-height:calc(100dvh - 120px);
+    overflow-y:auto;
+    grid-row:1;
+  }
+  .split-view-active #panel-editor{
+    grid-row:1;
+    overflow-y:auto;
+  }
+  /* All editor cards open in split view */
+  .split-view-active #panel-editor .card{
+    margin-bottom:8px;
+  }
+  .split-view-active #panel-editor .card .card-body{
+    display:block!important;
+  }
+  .split-view-active #panel-editor .card .c-arr{
+    transform:rotate(180deg);
+  }
+}
 </style>
 
 <!-- Firebase SDK -->
@@ -330,7 +389,7 @@ initFB();
 <div class="app" id="main-app" style="display:none">
 <div class="hdr">
   <div class="logo">Nota<em>Maker</em></div>
-  <span style="font-size:.55rem;color:var(--txt3);font-family:var(--mono);margin-left:2px;margin-top:2px;">v7.2</span>
+  <span style="font-size:.55rem;color:var(--txt3);font-family:var(--mono);margin-left:2px;margin-top:2px;">v7.3</span>
   <div class="hdr-r">
     <span class="user-chip" id="user-email-chip">...</span>
     <button class="btn b-gh b-sm" id="pwa-install-btn" onclick="doPWAInstall()" title="Pasang ke Layar Utama" style="display:none">📲 Pasang</button>
@@ -375,14 +434,25 @@ initFB();
 
 <!-- PREVIEW -->
 <div class="panel" id="panel-preview">
-  <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;">
+  <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;align-items:center;">
     <button class="btn b-p" onclick="xPDF()">📄 PDF</button>
     <button class="btn b-g" onclick="xExcel()">📊 Excel</button>
     <button class="btn b-gh" onclick="xPrint()">🖨 Print</button>
     <button class="btn b-y" onclick="xPNG()">🖼 PNG</button>
-    <button class="btn b-gh b-sm" onclick="exportWord()" title="Export ke Word (.doc format)">📝 Word</button>
+    <button class="btn b-gh b-sm" onclick="exportWord()">📝 Word</button>
+    <button class="btn b-gh b-sm" id="edit-mode-btn" onclick="toggleEditMode()" title="Edit langsung di preview">✏️ Edit</button>
+    <button class="btn b-gh b-sm" id="split-view-btn" onclick="toggleSplitView()" title="Tampilkan editor & preview berdampingan">⊞ Split</button>
   </div>
   <div id="pw"><div id="no"><div id="nr" style="padding:10px;min-width:200px;min-height:80px;"></div></div></div>
+</div>
+<!-- Floating edit input (Mode B) -->
+<div id="edit-float-box" class="edit-float" style="display:none">
+  <div class="edit-float-label" id="ef-label">Edit</div>
+  <div id="ef-input-wrap"></div>
+  <div class="edit-float-btns">
+    <button class="btn b-p b-sm" onclick="_efApply()">✓ Simpan</button>
+    <button class="btn b-gh b-sm" onclick="_efClose()">✕</button>
+  </div>
 </div>
 
 <!-- IMPORT -->
@@ -932,9 +1002,9 @@ function SEPM(n,ff,fpt,char='-'){
   return `<div style="font-family:${ff};font-size:${fpt}px;line-height:1.2">${char.repeat(n)}</div>`;
 }
 // Paragraph helpers
-function PC(txt,sz,fw,ff,extra=''){return`<div style="text-align:center;font-size:${sz}px;font-weight:${fw};font-family:${ff};line-height:1.45;margin:0;${extra}">${e2(txt)}</div>`;}
-function PL(txt,sz,fw,ff,extra=''){return`<div style="font-size:${sz}px;font-weight:${fw};font-family:${ff};line-height:1.45;margin:0;${extra}">${e2(txt)}</div>`;}
-function PR(txt,sz,fw,ff,extra=''){return`<div style="text-align:right;font-size:${sz}px;font-weight:${fw};font-family:${ff};line-height:1.45;margin:0;${extra}">${e2(txt)}</div>`;}
+function PC(txt,sz,fw,ff,extra='',ef=''){const da=ef?` data-ef="${ef}"`:'';return`<div${da} style="text-align:center;font-size:${sz}px;font-weight:${fw};font-family:${ff};line-height:1.45;margin:0;${extra}">${e2(txt)}</div>`;}
+function PL(txt,sz,fw,ff,extra='',ef=''){const da=ef?` data-ef="${ef}"`:'';return`<div${da} style="font-size:${sz}px;font-weight:${fw};font-family:${ff};line-height:1.45;margin:0;${extra}">${e2(txt)}</div>`;}
+function PR(txt,sz,fw,ff,extra='',ef=''){const da=ef?` data-ef="${ef}"`:'';return`<div${da} style="text-align:right;font-size:${sz}px;font-weight:${fw};font-family:${ff};line-height:1.45;margin:0;${extra}">${e2(txt)}</div>`;}
 // Table cell style
 function TC(align,w,txt,sz,fw,ff,extra=''){return`<td style="text-align:${align};width:${w};font-size:${sz}px;font-weight:${fw};font-family:${ff};padding:0;vertical-align:top;${extra}">${e2(txt)}</td>`;}
 function e2(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
@@ -964,6 +1034,7 @@ function renderPreview(){
     default:         html=rKAIROS(pw);
   }
   document.getElementById('nr').innerHTML=html;
+  if(typeof _rpHook==='function') _rpHook();
 }
 
 // ── 1. KAIROS ──────────────────────────────────────────────────────
@@ -983,9 +1054,9 @@ function rKAIROS(pw){
   const ff="'Barlow Condensed',sans-serif";
   const sz=6; const hsz=8;
   let h='';
-  h+=PC(S.shopName,hsz,700,ff);
-  if(S.shopAddr)h+=PC(S.shopAddr,sz,300,ff);
-  if(S.shopPhone)h+=PC(S.shopPhone,sz,300,ff);
+  h+=PC(S.shopName,hsz,700,ff,'','shopName');
+  if(S.shopAddr)h+=PC(S.shopAddr,sz,300,ff,'','shopAddr');
+  if(S.shopPhone)h+=PC(S.shopPhone,sz,300,ff,'','shopPhone');
   h+=SEP(ff,sz);
   // Meta table — 2 col
   h+=`<table style="width:100%;border-collapse:collapse;font-size:${sz}px;font-family:${ff};font-weight:300;line-height:1.65">
@@ -1270,14 +1341,21 @@ function rSPBU(pw){
   h+=`<div style="text-align:center;margin-bottom:1px;display:flex;align-items:center;justify-content:center;gap:6px"><img src="${LOGO_PERTAMINA}" style="height:${logoH}px;width:auto"><span style="font-size:${sz}px;font-weight:600;font-family:${ff}">${e(sp.id)}</span></div>`;
 
   // P02-03: Nama & Alamat — CENTER, Segoe UI Light → Barlow 300
-  h+=`<div style="text-align:center;font-size:${sz}px;font-weight:300;font-family:${ff};line-height:${lineH};margin:0">${e(S.shopName)}</div>`;
-  if(S.shopAddr)h+=`<div style="text-align:center;font-size:${sz}px;font-weight:300;font-family:${ff};line-height:${lineH};margin:0">${e(S.shopAddr)}</div>`;
-  // P04: "Shift   : 1No. Trans: 1111224" — LEFT, one paragraph
-  // Exact: "Shift   : " (3 spaces after Shift) then shift number, then "No. Trans: " then noTrans
-  h+=`<div style="font-size:${sz}px;font-weight:300;font-family:${ff};line-height:1.45;margin:0">Shift&nbsp;&nbsp;&nbsp;: ${sp.shift}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;No. Trans: ${e(sp.noTrans)}</div>`;
-  // P05: Waktu — LEFT
+  h+=`<div data-ef="shopName" style="text-align:center;font-size:${sz}px;font-weight:300;font-family:${ff};line-height:${lineH};margin:0">${e(S.shopName)}</div>`;
+  if(S.shopAddr)h+=`<div data-ef="shopAddr" style="text-align:center;font-size:${sz}px;font-weight:300;font-family:${ff};line-height:${lineH};margin:0">${e(S.shopAddr)}</div>`;
+  // P04-05: Shift/NoTrans dan Waktu/Jam — tabel 2 kolom agar sejajar
   const dateStr=S.date?S.date.split('-').reverse().join('/'):'';
-  h+=`<div style="font-size:${sz}px;font-weight:300;font-family:${ff};line-height:1.45;margin:0">Waktu: ${dateStr}  ${S.time}:00</div>`;
+  h+=`<table style="width:100%;border-collapse:collapse;font-size:${sz}px;font-weight:300;font-family:${ff}">
+    <colgroup><col style="width:42%"><col style="width:58%"></colgroup>
+    <tr>
+      <td style="padding:0;line-height:1.65">Shift &nbsp;&nbsp;&nbsp;: ${sp.shift}</td>
+      <td style="padding:0;line-height:1.65">No. Trans: ${e(sp.noTrans)}</td>
+    </tr>
+    <tr>
+      <td style="padding:0;line-height:1.65">Waktu: ${dateStr}</td>
+      <td style="padding:0;line-height:1.65">${S.time}:00</td>
+    </tr>
+  </table>`;
   // P06: Separator — 42 dashes fills 52.5mm (SEP overflow trick)
   h+=`<div style="font-size:${sz}px;font-weight:300;font-family:${ff};line-height:1.1;overflow:hidden;white-space:nowrap;letter-spacing:0;margin:0">${'-'.repeat(300)}</div>`;
   // TABLE: 6 rows x 2 cols (22.5mm|25.2mm) = 43%|48% of 52.5mm + padding
@@ -1328,10 +1406,10 @@ function rPLN_ABIA(pw){
   const LP=window._layoutPrefs||{};const lp=LP['pln_abia']||{};
   let h='';
   // Logo centered — size controllable
-  const logoH=lp.logoH||26;
+  const logoH=lp.logoH||40;
   h+=`<div style="text-align:center;margin-bottom:3px"><img src="${LOGO_BUKALAPAK}" style="height:${logoH}px;width:auto;display:inline-block"></div>`;
-  h+=PC(p.outletName,lp.szOutlet||14,700,ff);
-  h+=PC(p.judul,lp.szJudul||14,700,ff);
+  h+=PC(p.outletName,lp.szOutlet||14,700,ff,'','pln.outletName');
+  h+=PC(p.judul,lp.szJudul||14,700,ff,'','pln.judul');
   // Full-width separator using SEP overflow trick
   h+=SEP(ff,sz);
   // Data: TABLE 2-col — labels left, values right, colon aligned
@@ -1373,7 +1451,7 @@ function rPLN_ABIA(pw){
     </tr>
   </table>`;
   h+=SEP(ff,sz);
-  h+=PC(p.info,sz,400,ff);
+  h+=PC(p.info,sz,400,ff,'','pln.info');
   return h;
 }
 
@@ -1405,9 +1483,9 @@ function rPLN_TOPED(pw){
   const logoH=lp.logoH||22;
   h+=`<div style="text-align:center;margin-bottom:0;line-height:1"><img src="${LOGO_TOKOPEDIA}" style="height:${logoH}px;width:auto;display:inline-block"></div>`;
   h+=`<div style="line-height:1.45;margin:0">&nbsp;</div>`;
-  h+=`<div style="text-align:center;font-size:${szH}px;font-weight:700;font-family:${ff};line-height:1.45;margin:0">${e(p.outletName)}</div>`;
+  h+=`<div data-ef="toped.outletName" style="text-align:center;font-size:${szH}px;font-weight:700;font-family:${ff};line-height:1.45;margin:0">${e(p.outletName)}</div>`;
   h+=`<div style="line-height:1.45;margin:0">&nbsp;</div>`;
-  h+=`<div style="text-align:center;font-size:${szH}px;font-weight:700;font-family:${ff};line-height:1.45;margin:0">${e(p.judul)}</div>`;
+  h+=`<div data-ef="toped.judul" style="text-align:center;font-size:${szH}px;font-weight:700;font-family:${ff};line-height:1.45;margin:0">${e(p.judul)}</div>`;
   h+=`<div style="text-align:center;font-size:${sz}px;font-weight:400;font-family:${ff};line-height:1.45;margin:0">${e(p.noOrder)}</div>`;
   h+=`<div style="text-align:center;font-size:${sz}px;font-weight:400;font-family:${ff};line-height:1.45;margin:0">${e(p.datetime)}</div>`;
   // Full-width separator
@@ -1429,12 +1507,16 @@ function rPLN_TOPED(pw){
   ];
   h+=`<table style="width:100%;border-collapse:collapse;font-size:${sz}px;font-family:${ff};font-weight:400">
     <colgroup><col style="width:44%"><col style="width:4%"><col style="width:52%"></colgroup>`;
-  rows.forEach(([lbl,val])=>
+  rows.forEach(([lbl,val])=>{
+    // Support newline in value — split by \n for multiline
+    const valLines=String(val||'').split('\n');
+    const valHtml=valLines.map(l=>`<div style="line-height:1.6;word-break:break-word">${e(l)}</div>`).join('');
     h+=`<tr>
       <td style="padding:0;line-height:1.6;vertical-align:top">${e(lbl)}</td>
       <td style="padding:0;line-height:1.6;text-align:center;vertical-align:top">:</td>
-      <td style="padding:0;line-height:1.6;vertical-align:top;word-break:break-all">${e(String(val||''))}</td>
-    </tr>`);
+      <td style="padding:0;vertical-align:top">${valHtml}</td>
+    </tr>`;
+  });
   h+=`</table>`;
   // Full-width separator
   h+=SEP(ff,szH);
@@ -1455,8 +1537,8 @@ function rPLN_KHOLID(pw){
   const sz=lp.sz||12;const szJudul=lp.szJudul||20;const szOutlet=lp.szOutlet||12;
   const szSub=lp.szH||14;const lineH=lp.lineH||2.2;
   let h='';
-  h+=PL(k.outletName,szOutlet,400,ff);
-  h+=PL(k.datetime,szOutlet,400,ff);
+  h+=PL(k.outletName,szOutlet,400,ff,'','kholid.outletName');
+  h+=PL(k.datetime,szOutlet,400,ff,'','kholid.datetime');
   h+=`<br>`;
   h+=PC(k.judulBesar,szJudul,700,ff);
   h+=PC(k.judulKecil,szSub,400,ff);
@@ -1495,13 +1577,30 @@ function rBANNER(pw,isWide){
     <span>${e(S.shopName)}</span><span>INVOICE</span></div>`;
   if(S.shopAddr)h+=PL(S.shopAddr,sz,400,ff);
   if(S.shopPhone)h+=PL(S.shopPhone,sz,400,ff);
-  h+=`<div style="font-family:${ff};font-size:${sz}px;font-weight:700;margin-top:5px;line-height:1.5">Kepada :</div>`;
-  h+=`<div style="font-family:${ff};font-size:${sz}px;font-weight:700;line-height:1.5">${e(S.custName)}</div>`;
-  if(S.custId)h+=`<div style="font-family:${ff};font-size:${sz}px;font-weight:700">ID : ${e(S.custId)}</div>`;
-  h+=`<div style="font-family:${ff};font-size:${sz}px;font-weight:700">Nomor             : #${e(S.notaNum)}</div>`;
-  h+=`<div style="font-family:${ff};font-size:${sz}px;font-weight:700">Tanggal : ${S.date}-${S.time}</div>`;
-  h+=`<div style="font-family:${ff};font-size:${sz}px;font-weight:700">Kasir                : ${e(S.cashier)}</div>`;
-  h+=`<div style="font-family:${ff};font-size:${sz}px;font-weight:700">Terms : ${e(S.terms||'No')}</div><br>`;
+  // Meta info — tabel 2 kolom agar titik dua sejajar
+  const tglFmt=S.date?S.date.split('-').reverse().join('/'):'';
+  const metaRows=[
+    ['Kepada',''],
+    ['',e(S.custName)],
+  ];
+  if(S.custId) metaRows.push(['ID',e(S.custId)]);
+  metaRows.push(
+    ['Nomor','#'+e(S.notaNum)],
+    ['Tanggal',tglFmt+' '+S.time],
+    ['Kasir',e(S.cashier)],
+    ['Terms',e(S.terms||'No')]
+  );
+  h+=`<table style="width:auto;border-collapse:collapse;font-size:${sz}px;font-family:${ff};font-weight:700;margin-top:5px;line-height:1.65">`;
+  metaRows.forEach(([lbl,val])=>{
+    if(!lbl&&!val) return;
+    if(!lbl) { h+=`<tr><td colspan="3" style="padding:0">${val}</td></tr>`; return; }
+    h+=`<tr>
+      <td style="padding:0;white-space:nowrap;padding-right:4px">${lbl}</td>
+      <td style="padding:0 4px">${val?':':''}</td>
+      <td style="padding:0">${val}</td>
+    </tr>`;
+  });
+  h+=`</table><br>`;
   h+=`<table style="width:100%;border-collapse:collapse;font-size:${sz}px;font-family:${ff}">
     <tr style="border-bottom:1px solid #999;font-weight:700">
       <th style="text-align:center;padding:3px;width:5%">No</th>
@@ -2176,7 +2275,7 @@ document.addEventListener('DOMContentLoaded',function(){
 <div class="auth-overlay" id="auth-overlay">
   <div class="auth-box">
     <div class="auth-logo"><div class="logo">Nota<em>Maker</em></div>
-    <div style="font-size:.68rem;color:#3d5070;text-align:center;margin-top:4px;font-family:'Source Code Pro',monospace;">v7.2</div></div>
+    <div style="font-size:.68rem;color:#3d5070;text-align:center;margin-top:4px;font-family:'Source Code Pro',monospace;">v7.3</div></div>
     <div class="auth-title" id="auth-title">Masuk ke Akun Anda</div>
     <div class="auth-tab">
       <button class="auth-tab-btn on" id="tab-login" onclick="switchAuthTab('login')">Masuk</button>
@@ -2256,7 +2355,7 @@ document.addEventListener('DOMContentLoaded',function(){
 <div class="auth-overlay" id="welcome-overlay" style="display:none">
   <div class="auth-box">
     <div class="auth-logo"><div class="logo">Nota<em>Maker</em></div>
-    <div style="font-size:.68rem;color:#3d5070;text-align:center;margin-top:4px;font-family:'Source Code Pro',monospace;">v7.2</div></div>
+    <div style="font-size:.68rem;color:#3d5070;text-align:center;margin-top:4px;font-family:'Source Code Pro',monospace;">v7.3</div></div>
     <div style="text-align:center;font-size:.85rem;color:#7a90b5;margin-bottom:6px;">Selamat datang kembali 👋</div>
     <div style="text-align:center;font-size:1rem;font-weight:700;color:#dde4f0;margin-bottom:18px;" id="wb-email">—</div>
     <button class="btn b-p b-w" style="margin-bottom:10px" onclick="doWelcomeContinue()">▶ Lanjut</button>
@@ -2319,7 +2418,7 @@ document.addEventListener('DOMContentLoaded',function(){
 window._layoutPrefs = JSON.parse(localStorage.getItem('nm_layout_prefs')||'{}');
 
 const _LP_DEFAULTS = {
-  pln_abia:  {logoH:26,szJudul:14,szOutlet:14,sz:9,szH:11,lineH:1.5,padTop:0},
+  pln_abia:  {logoH:40,szJudul:14,szOutlet:14,sz:9,szH:11,lineH:1.5,padTop:0},
   pln_toped: {logoH:22,szJudul:11,szOutlet:11,sz:10,szH:11,sz12:12,sz13:13,lineH:1.6,padTop:0},
   pln_kholid:{logoH:0, szJudul:20,szOutlet:12,sz:12,szH:14,lineH:2.2,padTop:0},
   spbu:      {logoH:20,szJudul:8, szOutlet:8, sz:8, szH:8, lineH:1.45,padTop:0},
@@ -2500,5 +2599,206 @@ window.syncNotas=async function(){
 // Firebase module (deferred) runs after all regular scripts, sets these properly
 if(!window.fbSaveLayoutPrefs) window.fbSaveLayoutPrefs=null;
 if(!window.fbLoadLayoutPrefs) window.fbLoadLayoutPrefs=null;
-</script>
 
+// ═══════════════════════════════════════════════════════════════════
+// v7.3 — EDIT PREVIEW MODE B + SPLIT VIEW MODE C
+// ═══════════════════════════════════════════════════════════════════
+
+let _editModeOn = false;
+let _splitViewOn = false;
+let _efCurrentEl = null;
+let _efCurrentKey = null;
+
+// ── Field mapping: data-ef key → S path + label + multiline ──
+const _EF_MAP = {
+  'shopName':          {path:'shopName',        label:'Nama Toko',        multi:false},
+  'shopAddr':          {path:'shopAddr',        label:'Alamat',           multi:true},
+  'shopPhone':         {path:'shopPhone',       label:'Telepon',          multi:false},
+  'notaNum':           {path:'notaNum',         label:'No. Nota',         multi:false},
+  'custName':          {path:'custName',        label:'Nama Pelanggan',   multi:false},
+  'custAddr':          {path:'custAddr',        label:'Alamat Pelanggan', multi:true},
+  'cashier':           {path:'cashier',         label:'Kasir',            multi:false},
+  'footerMsg':         {path:'footerMsg',       label:'Pesan Footer',     multi:false},
+  'footerMsg2':        {path:'footerMsg2',      label:'Footer Baris 2',   multi:true},
+  'notes':             {path:'notes',           label:'Catatan',          multi:true},
+  'pln.outletName':    {path:'pln.outletName',  label:'Nama Outlet PLN',  multi:false},
+  'pln.judul':         {path:'pln.judul',       label:'Judul Struk PLN',  multi:false},
+  'pln.info':          {path:'pln.info',        label:'Info Kontak PLN',  multi:false},
+  'toped.outletName':  {path:'toped.outletName',label:'Nama Outlet',      multi:false},
+  'toped.judul':       {path:'toped.judul',     label:'Judul Tokopedia',  multi:false},
+  'toped.jenisLayanan':{path:'toped.jenisLayanan',label:'Jenis Layanan',  multi:true},
+  'kholid.outletName': {path:'kholid.outletName',label:'Nama Outlet',     multi:false},
+  'kholid.datetime':   {path:'kholid.datetime', label:'Tanggal & Waktu',  multi:false},
+};
+
+// Get value from S using dot-notation path
+function _efGetVal(path){
+  const parts = path.split('.');
+  let obj = S;
+  for(const p of parts){ if(obj==null) return ''; obj = obj[p]; }
+  return String(obj||'');
+}
+
+// Set value in S using dot-notation path
+function _efSetVal(path, val){
+  const parts = path.split('.');
+  let obj = S;
+  for(let i=0; i<parts.length-1; i++) obj = obj[parts[i]];
+  obj[parts[parts.length-1]] = val;
+}
+
+// Toggle Edit Mode
+function toggleEditMode(){
+  _editModeOn = !_editModeOn;
+  const panel = document.getElementById('panel-preview');
+  const btn = document.getElementById('edit-mode-btn');
+  if(_editModeOn){
+    panel.classList.add('edit-mode');
+    btn.classList.add('edit-mode-btn-active');
+    btn.textContent = '✏️ Edit ON';
+    toast('Edit Mode aktif — klik teks di preview untuk edit','ok');
+    _bindEditClicks();
+  } else {
+    panel.classList.remove('edit-mode');
+    btn.classList.remove('edit-mode-btn-active');
+    btn.textContent = '✏️ Edit';
+    _efClose();
+    _unbindEditClicks();
+  }
+}
+
+function _bindEditClicks(){
+  document.getElementById('nr').addEventListener('click', _efHandleClick);
+}
+function _unbindEditClicks(){
+  document.getElementById('nr').removeEventListener('click', _efHandleClick);
+}
+
+function _efHandleClick(e){
+  if(!_editModeOn) return;
+  // Find closest element with data-ef
+  const el = e.target.closest('[data-ef]');
+  if(!el) return;
+  e.stopPropagation();
+  const key = el.getAttribute('data-ef');
+  const map = _EF_MAP[key];
+  if(!map) return;
+  _efOpen(el, key, map);
+}
+
+function _efOpen(el, key, map){
+  _efClose();
+  _efCurrentEl = el;
+  _efCurrentKey = key;
+
+  const box = document.getElementById('edit-float-box');
+  const label = document.getElementById('ef-label');
+  const wrap = document.getElementById('ef-input-wrap');
+
+  label.textContent = map.label;
+  const val = _efGetVal(map.path);
+
+  if(map.multi){
+    wrap.innerHTML = `<textarea id="ef-input" rows="3">${val.replace(/
+/g,'&#10;')}</textarea>`;
+  } else {
+    wrap.innerHTML = `<input type="text" id="ef-input" value="${val.replace(/"/g,'&quot;')}">`;
+  }
+
+  // Position floating box near the element
+  const rect = el.getBoundingClientRect();
+  const boxW = 220;
+  let left = rect.left;
+  let top = rect.bottom + 6 + window.scrollY;
+  if(left + boxW > window.innerWidth - 10) left = window.innerWidth - boxW - 10;
+  if(left < 6) left = 6;
+
+  box.style.display = 'block';
+  box.style.left = left + 'px';
+  box.style.top = top + 'px';
+  box.style.position = 'absolute';
+
+  // Focus input
+  setTimeout(()=>{
+    const inp = document.getElementById('ef-input');
+    if(inp){ inp.focus(); inp.select(); }
+  }, 50);
+
+  // Enter key to save (single-line only)
+  const inp2 = document.getElementById('ef-input');
+  if(inp2 && !map.multi){
+    inp2.addEventListener('keydown', e=>{
+      if(e.key==='Enter'){ e.preventDefault(); _efApply(); }
+      if(e.key==='Escape'){ _efClose(); }
+    });
+  }
+}
+
+function _efApply(){
+  if(!_efCurrentKey) return;
+  const inp = document.getElementById('ef-input');
+  if(!inp) return;
+  const map = _EF_MAP[_efCurrentKey];
+  if(!map) return;
+  _efSetVal(map.path, inp.value);
+  _efClose();
+  renderPreview();
+  // Re-bind clicks after re-render
+  if(_editModeOn) _bindEditClicks();
+}
+
+function _efClose(){
+  document.getElementById('edit-float-box').style.display = 'none';
+  _efCurrentEl = null;
+  _efCurrentKey = null;
+}
+
+// Close float box on outside click
+document.addEventListener('click', function(e){
+  const box = document.getElementById('edit-float-box');
+  if(box && box.style.display !== 'none' && !box.contains(e.target)){
+    const efEl = e.target.closest('[data-ef]');
+    if(!efEl) _efClose();
+  }
+});
+
+// ── Split View Mode C ──────────────────────────────────────────────
+function toggleSplitView(){
+  _splitViewOn = !_splitViewOn;
+  const main = document.querySelector('.main');
+  const btn = document.getElementById('split-view-btn');
+  const app = document.getElementById('main-app');
+  if(_splitViewOn){
+    app.classList.add('split-view-active');
+    btn.classList.add('edit-mode-btn-active');
+    btn.textContent = '⊞ Split ON';
+    // Make sure both panels visible
+    document.getElementById('panel-preview').classList.add('on');
+    document.getElementById('panel-editor').classList.add('on');
+    renderPreview();
+    toast('Split view aktif — editor & preview berdampingan','ok');
+  } else {
+    app.classList.remove('split-view-active');
+    btn.classList.remove('edit-mode-btn-active');
+    btn.textContent = '⊞ Split';
+    // Restore to preview-only
+    document.getElementById('panel-editor').classList.remove('on');
+    document.querySelectorAll('.tab').forEach(t=>t.classList.remove('on'));
+    document.querySelector('[data-p="preview"]').classList.add('on');
+  }
+}
+
+// Auto split view on landscape rotation
+if(window.matchMedia){
+  const mq = window.matchMedia('(orientation:landscape) and (min-width:480px)');
+  mq.addEventListener('change', e=>{
+    if(e.matches && !_splitViewOn) toggleSplitView();
+    else if(!e.matches && _splitViewOn) toggleSplitView();
+  });
+}
+
+// Re-bind edit clicks: patch directly into renderPreview body via post-render hook
+// This is safe because renderPreview is in same script scope
+const _rpHook = ()=>{ if(_editModeOn) setTimeout(_bindEditClicks, 30); };
+
+</script>
