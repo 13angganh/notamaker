@@ -305,6 +305,21 @@ window.fbEmptyTrash = async()=>{
   return true;
 };
 
+// Layout Prefs — Firestore
+window.fbSaveLayoutPrefs = async(prefs)=>{
+  if(!_db||!window._fbUser) return null;
+  const uid=window._fbUser.uid;
+  await setDoc(doc(_db,'users',uid,'settings','layoutPrefs'),{...prefs,updatedAt:serverTimestamp()});
+  return true;
+};
+window.fbLoadLayoutPrefs = async()=>{
+  if(!_db||!window._fbUser) return null;
+  const uid=window._fbUser.uid;
+  const snap=await getDoc(doc(_db,'users',uid,'settings','layoutPrefs'));
+  if(!snap.exists()) return null;
+  const d={...snap.data()};delete d.updatedAt;return d;
+};
+
 // Auto init
 initFB();
 </script>
@@ -315,7 +330,7 @@ initFB();
 <div class="app" id="main-app" style="display:none">
 <div class="hdr">
   <div class="logo">Nota<em>Maker</em></div>
-  <span style="font-size:.55rem;color:var(--txt3);font-family:var(--mono);margin-left:2px;margin-top:2px;">v7.1</span>
+  <span style="font-size:.55rem;color:var(--txt3);font-family:var(--mono);margin-left:2px;margin-top:2px;">v7.2</span>
   <div class="hdr-r">
     <span class="user-chip" id="user-email-chip">...</span>
     <button class="btn b-gh b-sm" id="pwa-install-btn" onclick="doPWAInstall()" title="Pasang ke Layar Utama" style="display:none">📲 Pasang</button>
@@ -354,6 +369,7 @@ initFB();
     <button class="btn b-p" style="flex:1" onclick="saveNota()">💾 Simpan</button>
     <button class="btn b-r" style="flex:1" onclick="showTab('preview')">👁 Preview &amp; Cetak</button>
     <button class="btn b-y b-sm" onclick="exportWord()" title="Export ke Word (.doc format)">📝 Word</button>
+    <button class="btn b-gh b-sm" onclick="openLayoutPanel()" title="Pengaturan Tampilan">⚙️ Layout</button>
   </div>
 </div>
 
@@ -1245,15 +1261,17 @@ function rMEGAH(pw){
 // P22[l][8pt] separator
 // P23-29[c][8pt] subsidi lines
 function rSPBU(pw){
-  const sp=S.spbu;const ff="'Barlow',sans-serif";const sz=8;
+  const sp=S.spbu;const ff="'Barlow',sans-serif";
+  const LP=window._layoutPrefs||{};const lp=LP['spbu']||{};
+  const sz=lp.sz||8;const logoH=lp.logoH||20;const lineH=lp.lineH||1.45;
   // Content width 52.5mm. Margins: L=2.5 R=3mm
   let h='';
-  // P00: Logo Pertamina — LEFT aligned, separate paragraph
-  h+=`<div style="text-align:center;margin-bottom:1px;display:flex;align-items:center;justify-content:center;gap:6px"><img src="${LOGO_PERTAMINA}" style="height:20px;width:auto"><span style="font-size:${sz}px;font-weight:600;font-family:${ff}">${e(sp.id)}</span></div>`;
+  // P00: Logo Pertamina — center with ID, logo height controllable
+  h+=`<div style="text-align:center;margin-bottom:1px;display:flex;align-items:center;justify-content:center;gap:6px"><img src="${LOGO_PERTAMINA}" style="height:${logoH}px;width:auto"><span style="font-size:${sz}px;font-weight:600;font-family:${ff}">${e(sp.id)}</span></div>`;
 
   // P02-03: Nama & Alamat — CENTER, Segoe UI Light → Barlow 300
-  h+=`<div style="text-align:center;font-size:${sz}px;font-weight:300;font-family:${ff};line-height:1.45;margin:0">${e(S.shopName)}</div>`;
-  if(S.shopAddr)h+=`<div style="text-align:center;font-size:${sz}px;font-weight:300;font-family:${ff};line-height:1.45;margin:0">${e(S.shopAddr)}</div>`;
+  h+=`<div style="text-align:center;font-size:${sz}px;font-weight:300;font-family:${ff};line-height:${lineH};margin:0">${e(S.shopName)}</div>`;
+  if(S.shopAddr)h+=`<div style="text-align:center;font-size:${sz}px;font-weight:300;font-family:${ff};line-height:${lineH};margin:0">${e(S.shopAddr)}</div>`;
   // P04: "Shift   : 1No. Trans: 1111224" — LEFT, one paragraph
   // Exact: "Shift   : " (3 spaces after Shift) then shift number, then "No. Trans: " then noTrans
   h+=`<div style="font-size:${sz}px;font-weight:300;font-family:${ff};line-height:1.45;margin:0">Shift&nbsp;&nbsp;&nbsp;: ${sp.shift}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;No. Trans: ${e(sp.noTrans)}</div>`;
@@ -1307,44 +1325,54 @@ function rSPBU(pw){
 // LOGO: Bukalapak logo embedded (image in paragraph before P02)
 function rPLN_ABIA(pw){
   const p=S.pln;const ff="'Source Code Pro',monospace";const sz=9;
+  const LP=window._layoutPrefs||{};const lp=LP['pln_abia']||{};
   let h='';
-  // Logo centered
-  h+=`<div style="text-align:center;margin-bottom:3px"><img src="${LOGO_BUKALAPAK}" style="height:26px;width:auto;display:inline-block"></div>`;
-  h+=PC(p.outletName,14,700,ff);
-  h+=PC(p.judul,14,700,ff);
-  // Separator: 32 chars, center, BOLD — from docx P05: no font size = default
-  h+=SEPM(32,ff,sz);
-  // Data: TABLE 2-col (43%|57%) — labels left, values right
-  // line-height 1.5x (line=360 in docx)
-  const labels=['Waktu Dibuat','No Pesanan','IDPEL','NO METER','NAMA','TARIF/DAYA','NO REF','METERAI','PPN','PPJ','ANGSURAN','RP STROOM/TOKEN','JML KWH'];
-  const values=[
-    S.date.split('-').reverse().join('/')+' '+S.time,
-    p.noOrder,p.noPelanggan,p.noMeter,p.nama,p.tarif,p.noRef,
-    'Rp '+f(p.meterai||0),'Rp '+f(p.ppn||0),'Rp '+f(p.ppj||0),'Rp '+f(p.angsuran||0),
-    p.rpStroom>0?String(p.rpStroom):'100000',String(p.kwh||0)
+  // Logo centered — size controllable
+  const logoH=lp.logoH||26;
+  h+=`<div style="text-align:center;margin-bottom:3px"><img src="${LOGO_BUKALAPAK}" style="height:${logoH}px;width:auto;display:inline-block"></div>`;
+  h+=PC(p.outletName,lp.szOutlet||14,700,ff);
+  h+=PC(p.judul,lp.szJudul||14,700,ff);
+  // Full-width separator using SEP overflow trick
+  h+=SEP(ff,sz);
+  // Data: TABLE 2-col — labels left, values right, colon aligned
+  const rows=[
+    ['Waktu Dibuat', S.date.split('-').reverse().join('/')+' '+S.time],
+    ['No Pesanan',   p.noOrder],
+    ['IDPEL',        p.noPelanggan],
+    ['NO METER',     p.noMeter],
+    ['NAMA',         p.nama],
+    ['TARIF/DAYA',   p.tarif],
+    ['NO REF',       p.noRef],
+    ['METERAI',      'Rp '+f(p.meterai||0)],
+    ['PPN',          'Rp '+f(p.ppn||0)],
+    ['PPJ',          'Rp '+f(p.ppj||0)],
+    ['ANGSURAN',     'Rp '+f(p.angsuran||0)],
+    ['RP STROOM',    p.rpStroom>0?String(p.rpStroom):'100000'],
+    ['JML KWH',      String(p.kwh||0)],
+    ['STROOM/TOKEN', p.token||''],
   ];
   h+=`<table style="width:100%;border-collapse:collapse;font-size:${sz}px;font-family:${ff};font-weight:400">
-    <colgroup><col style="width:43%"><col style="width:57%"></colgroup>`;
-  labels.forEach((lbl,i)=>
-    h+=`<tr><td style="padding:0;line-height:1.5;vertical-align:top">${e(lbl)}</td>
-        <td style="text-align:right;padding:0;line-height:1.5;vertical-align:top;word-break:break-all">${e(values[i])}</td></tr>`);
+    <colgroup><col style="width:45%"><col style="width:5%"><col style="width:50%"></colgroup>`;
+  rows.forEach(([lbl,val])=>
+    h+=`<tr>
+      <td style="padding:0;line-height:1.5;vertical-align:top">${e(lbl)}</td>
+      <td style="padding:0;line-height:1.5;text-align:center;vertical-align:top">:</td>
+      <td style="padding:0;line-height:1.5;vertical-align:top;word-break:break-all">${e(val)}</td>
+    </tr>`);
   h+=`</table>`;
-  // STROOM/TOKEN row
-  h+=`<table style="width:100%;border-collapse:collapse;font-size:${sz}px;font-family:${ff};font-weight:400">
-    <colgroup><col style="width:43%"><col style="width:57%"></colgroup>
-    <tr><td style="padding:0;line-height:1.5">STROOM/TOKEN</td>
-        <td style="text-align:right;padding:0;line-height:1.5;word-break:break-all">${e(p.token||'')}</td></tr>
-  </table>`;
   // Token box (visual highlight)
   if(p.token){
     h+=`<div style="border:1.5px dashed #555;padding:5px 4px;margin:4px 0;text-align:center;font-family:${ff};font-size:13px;font-weight:700;letter-spacing:3px;word-break:break-all">${e(p.token)}</div>`;
   }
   h+=`<table style="width:100%;border-collapse:collapse;font-size:${sz}px;font-family:${ff};font-weight:400">
-    <colgroup><col style="width:43%"><col style="width:57%"></colgroup>
-    <tr><td style="padding:0;line-height:1.5">Total Tagihan</td>
-        <td style="text-align:right;padding:0;line-height:1.5">Rp ${f(p.total||0)}</td></tr>
+    <colgroup><col style="width:45%"><col style="width:5%"><col style="width:50%"></colgroup>
+    <tr>
+      <td style="padding:0;line-height:1.5">Total Tagihan</td>
+      <td style="padding:0;line-height:1.5;text-align:center">:</td>
+      <td style="padding:0;line-height:1.5">Rp ${f(p.total||0)}</td>
+    </tr>
   </table>`;
-  h+=SEPM(32,ff,sz);
+  h+=SEP(ff,sz);
   h+=PC(p.info,sz,400,ff);
   return h;
 }
@@ -1370,52 +1398,46 @@ function rPLN_ABIA(pw){
 // NOTE: "no-size" = browser default = use 11pt (between 10pt-12pt)
 function rPLN_TOPED(pw){
   const p=S.toped;const ff="'Courier Prime',monospace";
-  const szH=11; // "no size" = browser default ≈11pt
-  const sz=10;  // explicit 10pt for body
-  const sz12=12; // explicit 12pt for token
-  const sz13=13; // explicit 13pt for Total Bayar
+  const LP=window._layoutPrefs||{};const lp=LP['pln_toped']||{};
+  const szH=lp.szH||11;const sz=lp.sz||10;const sz12=lp.sz12||12;const sz13=lp.sz13||13;
   let h='';
-  // P00: Logo image — center, own paragraph
-  h+=`<div style="text-align:center;margin-bottom:0;line-height:1"><img src="${LOGO_TOKOPEDIA}" style="height:22px;width:auto;display:inline-block"></div>`;
-  // P01: empty spacer
+  // Logo — size controllable
+  const logoH=lp.logoH||22;
+  h+=`<div style="text-align:center;margin-bottom:0;line-height:1"><img src="${LOGO_TOKOPEDIA}" style="height:${logoH}px;width:auto;display:inline-block"></div>`;
   h+=`<div style="line-height:1.45;margin:0">&nbsp;</div>`;
-  // P02: "VINA" — center BOLD no-size (11pt)
   h+=`<div style="text-align:center;font-size:${szH}px;font-weight:700;font-family:${ff};line-height:1.45;margin:0">${e(p.outletName)}</div>`;
-  // P03: empty spacer
   h+=`<div style="line-height:1.45;margin:0">&nbsp;</div>`;
-  // P04: judul — center BOLD no-size
   h+=`<div style="text-align:center;font-size:${szH}px;font-weight:700;font-family:${ff};line-height:1.45;margin:0">${e(p.judul)}</div>`;
-  // P05-06: no order + datetime — center 10pt no bold
   h+=`<div style="text-align:center;font-size:${sz}px;font-weight:400;font-family:${ff};line-height:1.45;margin:0">${e(p.noOrder)}</div>`;
   h+=`<div style="text-align:center;font-size:${sz}px;font-weight:400;font-family:${ff};line-height:1.45;margin:0">${e(p.datetime)}</div>`;
-  // P07: separator — center BOLD no-size (11pt) 32 chars
-  h+=`<div style="text-align:center;font-size:${szH}px;font-weight:700;font-family:${ff};line-height:1.2;margin:0">${'-'.repeat(32)}</div>`;
-  // P08: "Token" — center no-size (11pt) NO BOLD
+  // Full-width separator
+  h+=SEP(ff,szH);
   h+=`<div style="text-align:center;font-size:${szH}px;font-weight:400;font-family:${ff};line-height:1.45;margin:0">Token</div>`;
-  // P09: token number — center 12pt BOLD, letter-spacing
   h+=`<div style="text-align:center;font-size:${sz12}px;font-weight:700;font-family:${ff};line-height:1.45;margin:0;letter-spacing:1px">${e(p.token)}</div>`;
-  // P10: separator — center BOLD no-size 32 chars
-  h+=`<div style="text-align:center;font-size:${szH}px;font-weight:700;font-family:${ff};line-height:1.2;margin:0">${'-'.repeat(32)}</div>`;
-  // TABLE: 1 row, 2 cols (35.6mm | 39.4mm)
-  // Left labels, Right values — stacked as paragraphs in each cell
-  const labels=['Jenis Layanan:','','No. Meter /','Idpel:','Nama:','kWh:','Tarif / Daya:','No Ref:',''];
-  const values=[p.jenisLayanan,'',p.noMeter,'',p.nama,p.kwh,p.tarif,p.noRef1,p.noRef2];
-  const leftHtml=labels.map(l=>
-    `<div style="font-size:${sz}px;font-weight:400;font-family:${ff};line-height:1.6;margin:0">${e(l)||'&nbsp;'}</div>`
-  ).join('');
-  const rightHtml=values.map(v=>
-    `<div style="font-size:${sz}px;font-weight:400;font-family:${ff};line-height:1.6;margin:0">${e(v)||'&nbsp;'}</div>`
-  ).join('');
-  h+=`<table style="width:100%;border-collapse:collapse">
-    <colgroup><col style="width:35.6mm"><col style="width:39.4mm"></colgroup>
-    <tr>
-      <td style="padding:0;vertical-align:top">${leftHtml}</td>
-      <td style="padding:0;vertical-align:top">${rightHtml}</td>
-    </tr>
-  </table>`;
-  // P27: separator — center BOLD no-size 32 chars
-  h+=`<div style="text-align:center;font-size:${szH}px;font-weight:700;font-family:${ff};line-height:1.2;margin:0">${'-'.repeat(32)}</div>`;
-  // P28: "Total Bayar: Rp102.500" — center 13pt BOLD
+  // Full-width separator
+  h+=SEP(ff,szH);
+  // TABLE: 3 cols — label | colon | value (colon sejajar semua)
+  const rows=[
+    ['Jenis Layanan', p.jenisLayanan],
+    ['No. Meter',     p.noMeter],
+    ['Idpel',         ''],
+    ['Nama',          p.nama],
+    ['kWh',           p.kwh],
+    ['Tarif / Daya',  p.tarif],
+    ['No Ref 1',      p.noRef1],
+    ['No Ref 2',      p.noRef2],
+  ];
+  h+=`<table style="width:100%;border-collapse:collapse;font-size:${sz}px;font-family:${ff};font-weight:400">
+    <colgroup><col style="width:44%"><col style="width:4%"><col style="width:52%"></colgroup>`;
+  rows.forEach(([lbl,val])=>
+    h+=`<tr>
+      <td style="padding:0;line-height:1.6;vertical-align:top">${e(lbl)}</td>
+      <td style="padding:0;line-height:1.6;text-align:center;vertical-align:top">:</td>
+      <td style="padding:0;line-height:1.6;vertical-align:top;word-break:break-all">${e(String(val||''))}</td>
+    </tr>`);
+  h+=`</table>`;
+  // Full-width separator
+  h+=SEP(ff,szH);
   h+=`<div style="text-align:center;font-size:${sz13}px;font-weight:700;font-family:${ff};line-height:1.45;margin:0">Total Bayar: Rp${f(p.totalBayar)}</div>`;
   return h;
 }
@@ -1428,13 +1450,16 @@ function rPLN_TOPED(pw){
 // Token: center, large, bold, dashes format
 // === Terima Kasih === : center small
 function rPLN_KHOLID(pw){
-  const k=S.kholid;const ff="'Barlow',sans-serif";const sz=12;
+  const k=S.kholid;const ff="'Barlow',sans-serif";
+  const LP=window._layoutPrefs||{};const lp=LP['pln_kholid']||{};
+  const sz=lp.sz||12;const szJudul=lp.szJudul||20;const szOutlet=lp.szOutlet||12;
+  const szSub=lp.szH||14;const lineH=lp.lineH||2.2;
   let h='';
-  h+=PL(k.outletName,sz,400,ff);
-  h+=PL(k.datetime,sz,400,ff);
+  h+=PL(k.outletName,szOutlet,400,ff);
+  h+=PL(k.datetime,szOutlet,400,ff);
   h+=`<br>`;
-  h+=PC(k.judulBesar,20,700,ff);
-  h+=PC(k.judulKecil,14,400,ff);
+  h+=PC(k.judulBesar,szJudul,700,ff);
+  h+=PC(k.judulKecil,szSub,400,ff);
   h+=`<br>`;
   const rows=[
     ['TANGGAL',':',k.tanggal],['ID TRANSAKSI',':',k.idTransaksi],
@@ -1443,7 +1468,7 @@ function rPLN_KHOLID(pw){
     ['GOLONGAN',':',k.golongan],['DAYA METER',':',k.dayaMeter],
     ['DAYA TOKEN',':',k.dayaToken],['HARGA',':',k.harga],
   ];
-  h+=`<table style="width:100%;border-collapse:collapse;font-size:${sz}px;font-family:${ff};font-weight:400;line-height:2.2">
+  h+=`<table style="width:100%;border-collapse:collapse;font-size:${sz}px;font-family:${ff};font-weight:400;line-height:${lineH}">
     <colgroup><col style="width:40%"><col style="width:6%"><col style="width:54%"></colgroup>
     ${rows.map(([l,s,v])=>`<tr><td style="padding:0;color:#333">${e(l)}</td><td style="padding:0;text-align:center;color:#333">${s}</td><td style="padding:0;color:#111">${e(v)}</td></tr>`).join('')}
   </table>`;
@@ -1462,9 +1487,11 @@ function rPLN_KHOLID(pw){
 // Font: default bold (header) + Calibri (body)
 // Table: NO borders, 6 col layout
 function rBANNER(pw,isWide){
-  const c=S._calc;const ff="'Barlow',sans-serif";const sz=12;
+  const c=S._calc;const ff="'Barlow',sans-serif";
+  const LP=window._layoutPrefs||{};const lp=LP['banner']||{};
+  const sz=lp.sz||12;const szJudul=lp.szJudul||13;const lineH=lp.lineH||1.5;
   let h='';
-  h+=`<div style="display:flex;justify-content:space-between;align-items:baseline;font-size:13px;font-weight:700;font-family:${ff};margin-bottom:5px">
+  h+=`<div style="display:flex;justify-content:space-between;align-items:baseline;font-size:${szJudul}px;font-weight:700;font-family:${ff};margin-bottom:5px">
     <span>${e(S.shopName)}</span><span>INVOICE</span></div>`;
   if(S.shopAddr)h+=PL(S.shopAddr,sz,400,ff);
   if(S.shopPhone)h+=PL(S.shopPhone,sz,400,ff);
@@ -1652,7 +1679,7 @@ function showDateModal(id,nota){
     <div style="font-size:.85rem;font-weight:600;color:var(--acc);margin-bottom:14px;font-family:var(--mono)">📅 UBAH TANGGAL NOTA</div>
     <div style="margin-bottom:10px">
       <label style="font-size:.7rem;color:var(--txt2);display:block;margin-bottom:3px">Tanggal Nota</label>
-      <input type="date" id="modal-date" value="${nota.date||''}" style="width:100%;background:var(--bg3);border:1px solid var(--bdr);border-radius:6px;padding:9px 11px;color:var(--txt);font-size:.9rem;outline:none">
+      <input type="date" id="inline-date-input" value="${nota.date||''}" style="width:100%;background:var(--bg3);border:1px solid var(--bdr);border-radius:6px;padding:9px 11px;color:var(--txt);font-size:.9rem;outline:none">
     </div>
     <div style="margin-bottom:10px">
       <label style="font-size:.7rem;color:var(--txt2);display:block;margin-bottom:3px">Waktu Nota</label>
@@ -1671,7 +1698,7 @@ function showDateModal(id,nota){
 function applyDateChange(id){
   const list=JSON.parse(localStorage.getItem('notas')||'[]');
   const n=list.find(s=>s.id===id);if(!n)return;
-  const d=document.getElementById('modal-date')?.value;
+  const d=document.getElementById('inline-date-input')?.value;
   const t=document.getElementById('modal-time')?.value;
   if(d)n.date=d;if(t)n.time=t;
   n.editedAt=new Date().toISOString();
@@ -2149,7 +2176,7 @@ document.addEventListener('DOMContentLoaded',function(){
 <div class="auth-overlay" id="auth-overlay">
   <div class="auth-box">
     <div class="auth-logo"><div class="logo">Nota<em>Maker</em></div>
-    <div style="font-size:.68rem;color:#3d5070;text-align:center;margin-top:4px;font-family:'Source Code Pro',monospace;">v7.1</div></div>
+    <div style="font-size:.68rem;color:#3d5070;text-align:center;margin-top:4px;font-family:'Source Code Pro',monospace;">v7.2</div></div>
     <div class="auth-title" id="auth-title">Masuk ke Akun Anda</div>
     <div class="auth-tab">
       <button class="auth-tab-btn on" id="tab-login" onclick="switchAuthTab('login')">Masuk</button>
@@ -2175,7 +2202,7 @@ document.addEventListener('DOMContentLoaded',function(){
   <span class="sync-dot" id="sync-dot"></span>
   <strong id="user-email-label">—</strong>
   <span id="sync-status" style="flex:1">—</span>
-  <button class="btn b-gh b-xs" id="sync-btn" onclick="syncNotas()" style="margin-left:auto">☁️ Sync</button>
+  <button class="btn b-gh b-xs" id="sync-btn" onclick="(window.syncNotas||syncNotas)()" style="margin-left:auto">☁️ Sync</button>
   <button class="btn b-xs" style="background:transparent;border:1px solid var(--err);color:var(--err);margin-left:4px" onclick="fbLogout();onLogout()">Keluar</button>
 </div>
 
@@ -2224,5 +2251,254 @@ document.addEventListener('DOMContentLoaded',function(){
   </div>
 </div>
 
-</body>
-</html>
+
+<!-- WELCOME BACK OVERLAY -->
+<div class="auth-overlay" id="welcome-overlay" style="display:none">
+  <div class="auth-box">
+    <div class="auth-logo"><div class="logo">Nota<em>Maker</em></div>
+    <div style="font-size:.68rem;color:#3d5070;text-align:center;margin-top:4px;font-family:'Source Code Pro',monospace;">v7.2</div></div>
+    <div style="text-align:center;font-size:.85rem;color:#7a90b5;margin-bottom:6px;">Selamat datang kembali 👋</div>
+    <div style="text-align:center;font-size:1rem;font-weight:700;color:#dde4f0;margin-bottom:18px;" id="wb-email">—</div>
+    <button class="btn b-p b-w" style="margin-bottom:10px" onclick="doWelcomeContinue()">▶ Lanjut</button>
+    <button class="btn b-gh b-w" onclick="doWelcomeSwitch()">🔄 Ganti Akun</button>
+  </div>
+</div>
+
+<!-- LAYOUT PANEL (bottom sheet) -->
+<div class="modal-bg modal-hidden" id="modal-layout">
+  <div class="modal-box" onclick="event.stopPropagation()" style="max-height:85vh;overflow-y:auto">
+    <div class="modal-handle"></div>
+    <div class="modal-title">⚙️ Pengaturan Tampilan</div>
+    <div style="font-size:.7rem;color:#4d8ef5;margin-bottom:10px;text-align:center">Template: <span id="lp-tpl-name">—</span></div>
+    <div style="margin-bottom:14px">
+      <div style="font-size:.72rem;font-weight:700;color:#dde4f0;margin-bottom:6px">🖼 Ukuran Logo</div>
+      <div class="g g2">
+        <div class="f"><label>Tinggi Logo (px)</label>
+          <input type="number" id="lp-logo-h" min="10" max="80" value="26" oninput="_lpSet('logoH',+this.value);renderPreview()"></div>
+        <div style="display:flex;align-items:flex-end;padding-bottom:2px">
+          <button class="btn b-gh b-sm" onclick="_lpReset('logoH');document.getElementById('lp-logo-h').value=_lpDefault('logoH');renderPreview()">↺ Reset</button>
+        </div>
+      </div>
+    </div>
+    <div style="margin-bottom:14px">
+      <div style="font-size:.72rem;font-weight:700;color:#dde4f0;margin-bottom:6px">🔤 Ukuran Font</div>
+      <div class="g g2">
+        <div class="f"><label>Judul Utama (pt)</label>
+          <input type="number" id="lp-sz-judul" min="8" max="24" value="14" oninput="_lpSet('szJudul',+this.value);renderPreview()"></div>
+        <div class="f"><label>Nama Outlet (pt)</label>
+          <input type="number" id="lp-sz-outlet" min="8" max="24" value="14" oninput="_lpSet('szOutlet',+this.value);renderPreview()"></div>
+        <div class="f"><label>Isi / Data (pt)</label>
+          <input type="number" id="lp-sz-body" min="6" max="16" value="9" oninput="_lpSet('sz',+this.value);renderPreview()"></div>
+        <div class="f"><label>Header (pt)</label>
+          <input type="number" id="lp-sz-h" min="8" max="18" value="11" oninput="_lpSet('szH',+this.value);renderPreview()"></div>
+      </div>
+    </div>
+    <div style="margin-bottom:14px">
+      <div style="font-size:.72rem;font-weight:700;color:#dde4f0;margin-bottom:6px">↕ Jarak Baris</div>
+      <div class="g g2">
+        <div class="f"><label>Line Height (×)</label>
+          <input type="number" id="lp-lh" min="1" max="3" step="0.1" value="1.5" oninput="_lpSet('lineH',+this.value);renderPreview()"></div>
+        <div class="f"><label>Padding Atas (px)</label>
+          <input type="number" id="lp-pad-top" min="0" max="20" value="0" oninput="_lpSet('padTop',+this.value);renderPreview()"></div>
+      </div>
+    </div>
+    <div style="display:flex;gap:7px;margin-top:4px">
+      <button class="btn b-gh" style="flex:1" onclick="_closeModal('modal-layout')">Tutup</button>
+      <button class="btn b-r b-sm" onclick="_lpResetAll();_lpLoadUI();renderPreview();toast('Reset ke default ✓','ok')">🗑 Reset</button>
+      <button class="btn b-p" style="flex:1" onclick="_lpSaveToCloud();_closeModal('modal-layout');toast('Pengaturan disimpan ✓','ok')">☁️ Simpan</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════
+// v7.2 ADDITIONS: Layout Prefs + Welcome Back + Sync Fix
+// ═══════════════════════════════════════════════════════════════════
+
+// ── Layout Preferences ──────────────────────────────────────────────
+window._layoutPrefs = JSON.parse(localStorage.getItem('nm_layout_prefs')||'{}');
+
+const _LP_DEFAULTS = {
+  pln_abia:  {logoH:26,szJudul:14,szOutlet:14,sz:9,szH:11,lineH:1.5,padTop:0},
+  pln_toped: {logoH:22,szJudul:11,szOutlet:11,sz:10,szH:11,sz12:12,sz13:13,lineH:1.6,padTop:0},
+  pln_kholid:{logoH:0, szJudul:20,szOutlet:12,sz:12,szH:14,lineH:2.2,padTop:0},
+  spbu:      {logoH:20,szJudul:8, szOutlet:8, sz:8, szH:8, lineH:1.45,padTop:0},
+  banner:    {logoH:0, szJudul:13,szOutlet:12,sz:12,szH:13,lineH:1.5,padTop:0},
+};
+
+function _lpGet(key){ 
+  const tpl=S.tpl; 
+  return (window._layoutPrefs[tpl]||{})[key] ?? (_LP_DEFAULTS[tpl]||{})[key];
+}
+function _lpSet(key,val){
+  const tpl=S.tpl;
+  if(!window._layoutPrefs[tpl]) window._layoutPrefs[tpl]={};
+  window._layoutPrefs[tpl][key]=val;
+  localStorage.setItem('nm_layout_prefs',JSON.stringify(window._layoutPrefs));
+}
+function _lpReset(key){
+  const tpl=S.tpl;
+  if(window._layoutPrefs[tpl]) delete window._layoutPrefs[tpl][key];
+  localStorage.setItem('nm_layout_prefs',JSON.stringify(window._layoutPrefs));
+}
+function _lpResetAll(){
+  const tpl=S.tpl;
+  delete window._layoutPrefs[tpl];
+  localStorage.setItem('nm_layout_prefs',JSON.stringify(window._layoutPrefs));
+}
+function _lpDefault(key){ return (_LP_DEFAULTS[S.tpl]||{})[key]||0; }
+
+function _lpLoadUI(){
+  const tpl=TPLS.find(t=>t.id===S.tpl)||TPLS[0];
+  const el=document.getElementById('lp-tpl-name');
+  if(el) el.textContent=tpl.nm;
+  const set=(id,key,def)=>{const el=document.getElementById(id);if(el)el.value=_lpGet(key)??def;};
+  set('lp-logo-h','logoH',26);
+  set('lp-sz-judul','szJudul',14);
+  set('lp-sz-outlet','szOutlet',14);
+  set('lp-sz-body','sz',9);
+  set('lp-sz-h','szH',11);
+  set('lp-lh','lineH',1.5);
+  set('lp-pad-top','padTop',0);
+}
+
+function openLayoutPanel(){
+  _lpLoadUI();
+  _openModal('modal-layout');
+  setTimeout(()=>showTab('preview'),50);
+}
+
+async function _lpSaveToCloud(){
+  localStorage.setItem('nm_layout_prefs',JSON.stringify(window._layoutPrefs));
+  if(_fbLoggedIn && window.fbSaveLayoutPrefs){
+    await window.fbSaveLayoutPrefs(window._layoutPrefs).catch(e=>console.warn('LP sync:',e));
+  }
+}
+
+// ── Welcome Back Screen ──────────────────────────────────────────────
+let _welcomePendingUser=null;
+
+function _showWelcomeBack(user){
+  _welcomePendingUser=user;
+  const el=document.getElementById('wb-email');
+  if(el) el.textContent=user.email;
+  document.getElementById('welcome-overlay').style.display='flex';
+  document.getElementById('auth-overlay').style.display='none';
+}
+
+// doWelcomeContinue defined above in onLogin override block
+
+function doWelcomeSwitch(){
+  _welcomePendingUser=null;
+  document.getElementById('welcome-overlay').style.display='none';
+  if(typeof window.fbLogout==='function') window.fbLogout();
+  document.getElementById('auth-overlay').style.display='flex';
+}
+
+// Capture the real onLogin before overriding
+const _realOnLogin=window.onLogin;
+
+// Override window.onLogin: auto-restore shows welcome-back, manual login goes straight in
+window.onLogin=function(user){
+  if(window._justLoggedIn){
+    // Manual login just completed — go straight to app
+    window._justLoggedIn=false;
+    _realOnLogin(user);
+  } else {
+    // Auto-restore from Firebase session — show welcome-back screen
+    _showWelcomeBack(user);
+  }
+};
+
+// doWelcomeContinue must call _realOnLogin (not window.onLogin) to avoid loop
+function doWelcomeContinue(){
+  if(!_welcomePendingUser) return;
+  document.getElementById('welcome-overlay').style.display='none';
+  _realOnLogin(_welcomePendingUser);
+  _welcomePendingUser=null;
+}
+
+// Patch doAuth to flag manual login, reset flag if login fails
+const _origDoAuth=doAuth;
+window.doAuth=async function(){
+  window._justLoggedIn=true;
+  try{ await _origDoAuth(); }
+  catch(e){ window._justLoggedIn=false; throw e; }
+};
+
+// ── Sync Error Fix: retry + validate + debounce ──────────────────────
+let _syncRunning=false;
+window.syncNotas=async function(){
+  if(_syncRunning){toast('Sync sedang berjalan...','ok');return;}
+  _syncRunning=true;
+  const btn=document.getElementById('sync-btn');
+  if(btn){btn.textContent='⏳...';btn.disabled=true;}
+  try{
+    // Validate & repair notas before sync
+    let local=JSON.parse(localStorage.getItem('notas')||'[]');
+    local=local.map(n=>{
+      if(!n.id) n.id=Date.now()+Math.random();
+      if(!n.savedAt) n.savedAt=new Date().toISOString();
+      if(typeof n.id!=='number') n.id=Number(n.id)||Date.now();
+      return n;
+    });
+    localStorage.setItem('notas',JSON.stringify(local));
+
+    // Upload unsynced notas with retry
+    for(const n of local.filter(x=>!x._synced&&!x.trashed)){
+      let ok=false;
+      for(let attempt=0;attempt<3&&!ok;attempt++){
+        try{
+          if(window.fbSaveNota) await window.fbSaveNota(n);
+          ok=true;
+        }catch(e){
+          if(attempt===2) console.warn('Upload failed after 3 tries:',n.id,e.message);
+          else await new Promise(r=>setTimeout(r,800*(attempt+1)));
+        }
+      }
+      if(ok) n._synced=true;
+    }
+    localStorage.setItem('notas',JSON.stringify(local));
+
+    // Download from cloud
+    if(window.fbLoadNotas){
+      const cloud=await window.fbLoadNotas();
+      if(cloud&&cloud.length){
+        const map={};
+        local.forEach(n=>map[String(n.id)]=n);
+        cloud.forEach(n=>map[String(n.id)]={...n,_synced:true});
+        const merged=Object.values(map).sort((a,b)=>(b.savedAt||'')>(a.savedAt||'')?1:-1);
+        localStorage.setItem('notas',JSON.stringify(merged));
+      }
+    }
+
+    // Download layout prefs from cloud
+    if(window.fbLoadLayoutPrefs){
+      const cloudLP=await window.fbLoadLayoutPrefs().catch(()=>null);
+      if(cloudLP){
+        window._layoutPrefs={...cloudLP,...window._layoutPrefs};
+        localStorage.setItem('nm_layout_prefs',JSON.stringify(window._layoutPrefs));
+      }
+    }
+
+    renderSaved();
+    toast('Sync selesai ✓','ok');
+  }catch(e){
+    const msg=e.code==='permission-denied'?'Akses ditolak — cek Firestore Rules':
+              e.code==='unavailable'?'Server tidak tersedia — coba lagi nanti':
+              'Sync error: '+e.message;
+    toast(msg,'err');
+  }finally{
+    _syncRunning=false;
+    if(btn){btn.textContent='☁️ Sync';btn.disabled=false;}
+  }
+};
+
+// Sync button uses onclick attribute in HTML — no duplicate binding needed
+
+// ── Layout prefs Firebase stubs — overwritten by Firebase module on load ──
+// Firebase module (deferred) runs after all regular scripts, sets these properly
+if(!window.fbSaveLayoutPrefs) window.fbSaveLayoutPrefs=null;
+if(!window.fbLoadLayoutPrefs) window.fbLoadLayoutPrefs=null;
+</script>
+
